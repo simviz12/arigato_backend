@@ -1,0 +1,2 @@
+ALTER TABLE subproducts
+ADD COLUMN preparation_mode VARCHAR(50) NOT NULL DEFAULT 'MANUAL';
