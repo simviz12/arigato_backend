@@ -48,6 +48,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/health").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
+                .requestMatchers("/ws/**").permitAll()  // Allow WebSocket handshake (SockJS)
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll()
             )
