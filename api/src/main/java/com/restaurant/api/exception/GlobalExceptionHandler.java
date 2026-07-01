@@ -35,6 +35,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(RuntimeException.class)
+    public ProblemDetail handleRuntimeException(RuntimeException ex) {
+        String msg = ex.getMessage();
+        // Blacklisted or invalid refresh tokens → return 401 so the frontend redirects to login
+        if (msg != null && (msg.contains("blacklisted") || msg.contains("refresh token") || msg.contains("REFRESH"))) {
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "La sesión ha expirado. Por favor inicia sesión nuevamente.");
+            problem.setTitle("Session Expired");
+            problem.setType(URI.create("https://api.restaurant.com/errors/unauthorized"));
+            return problem;
+        }
+        ex.printStackTrace();
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "Error inesperado: " + msg);
+        problem.setTitle("Internal Server Error");
+        problem.setType(URI.create("https://api.restaurant.com/errors/internal-error"));
+        return problem;
+    }
+
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGenericException(Exception ex) {
         if ("Invalid credentials".equals(ex.getMessage())) {
