@@ -43,8 +43,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             problem.setType(URI.create("https://api.restaurant.com/errors/unauthorized"));
             return problem;
         }
-        
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
+        ex.printStackTrace();
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred: " + ex.getMessage());
         problem.setTitle("Internal Server Error");
         problem.setType(URI.create("https://api.restaurant.com/errors/internal-error"));
         return problem;

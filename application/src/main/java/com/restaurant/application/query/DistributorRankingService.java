@@ -34,13 +34,13 @@ public class DistributorRankingService {
             
             -- 2. Actual Purchases
             SELECT 
-                pl.primary_product_id,
-                p.distributor_id,
-                pl.unit_price_cents,
-                p.purchase_date as last_updated,
+                primary_product_id,
+                distributor_id,
+                (total_price_cents / quantity)::bigint as unit_price_cents,
+                purchase_date as last_updated,
                 'PURCHASE' as source
-            FROM purchase_lines pl
-            JOIN purchases p ON pl.purchase_id = p.id
+            FROM purchases
+            WHERE quantity > 0
         ),
         ranked_by_recency AS (
             SELECT 
@@ -65,8 +65,8 @@ public class DistributorRankingService {
                 SELECT 
                     pp.id as product_id,
                     pp.name as product_name,
-                    pp.category as category,
-                    pp.current_stock as current_stock,
+                    'General' as category,
+                    pp.current_stock_grams as current_stock,
                     pp.minimum_stock_alert as min_stock,
                     d.id as distributor_id,
                     d.name as distributor_name,
@@ -122,13 +122,12 @@ public class DistributorRankingService {
         // 1. Get actual volumes and average prices paid over last 30 days
         String actualsSql = """
             SELECT 
-                pl.primary_product_id,
-                SUM(pl.quantity) as total_qty,
-                SUM(pl.unit_price_cents * pl.quantity) as total_spent
-            FROM purchase_lines pl
-            JOIN purchases p ON pl.purchase_id = p.id
-            WHERE p.purchase_date >= current_date - interval '30 days'
-            GROUP BY pl.primary_product_id
+                primary_product_id,
+                SUM(quantity) as total_qty,
+                SUM(total_price_cents) as total_spent
+            FROM purchases
+            WHERE purchase_date >= current_date - interval '30 days'
+            GROUP BY primary_product_id
         """;
         
         List<Map<String, Object>> actuals = jdbcTemplate.queryForList(actualsSql);
@@ -192,5 +191,33 @@ public class DistributorRankingService {
                 "lastUpdated", rs.getTimestamp("last_updated").toLocalDateTime().toString(),
                 "source", rs.getString("source")
         ), productId);
+    }
+
+    public List<Map<String, Object>> getAllRankings() {
+        String sql = RANKING_CTE + """
+            SELECT 
+                pp.id as product_id,
+                pp.name as product_name,
+                'General' as category,
+                d.id as distributor_id,
+                d.name as distributor_name,
+                lp.unit_price_cents,
+                lp.last_updated,
+                lp.source
+            FROM primary_products pp
+            JOIN latest_prices lp ON pp.id = lp.primary_product_id
+            JOIN distributors d ON lp.distributor_id = d.id
+            ORDER BY pp.name ASC, lp.unit_price_cents ASC
+        """;
+        return jdbcTemplate.query(sql, (rs, rowNum) -> Map.of(
+                "productId", rs.getString("product_id"),
+                "productName", rs.getString("product_name"),
+                "category", rs.getString("category") != null ? rs.getString("category") : "General",
+                "distributorId", rs.getString("distributor_id"),
+                "distributorName", rs.getString("distributor_name"),
+                "costPerGram", rs.getLong("unit_price_cents") / 100.0,
+                "lastUpdated", rs.getTimestamp("last_updated").toLocalDateTime().toString(),
+                "source", rs.getString("source")
+        ));
     }
 }

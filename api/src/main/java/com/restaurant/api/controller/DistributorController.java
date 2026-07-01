@@ -17,6 +17,28 @@ public class DistributorController {
 
     private final CreateDistributorUseCase createDistributorUseCase;
     private final GetDistributorUseCase getDistributorUseCase;
+    private final com.restaurant.application.usecase.SaveDistributorOfferUseCase saveDistributorOfferUseCase;
+
+    public static class SaveOfferRequest {
+        public UUID primaryProductId;
+        public Double offeredQuantityGrams;
+        public Double offeredPricePesos;
+    }
+
+    @PostMapping("/{id}/offers")
+    public ResponseEntity<?> saveOffer(@PathVariable UUID id, @RequestBody SaveOfferRequest request) {
+        try {
+            saveDistributorOfferUseCase.execute(
+                    id,
+                    request.primaryProductId,
+                    request.offeredQuantityGrams,
+                    request.offeredPricePesos
+            );
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
+        }
+    }
 
     @PostMapping
     public ResponseEntity<Distributor> create(@RequestBody CreateDistributorUseCase.Command command) {

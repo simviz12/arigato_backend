@@ -24,14 +24,14 @@ public class AnalyticsQueryService {
         
         // 1. INGRESOS (Revenue)
         // Sum of sale totals
-        String sqlIngresos = "SELECT COALESCE(SUM(total_amount_cents), 0) FROM sales WHERE sale_date >= ? AND sale_date <= ?";
+        String sqlIngresos = "SELECT COALESCE(SUM(total_amount_cents), 0)::bigint FROM sales WHERE sale_date >= ? AND sale_date <= ?";
         Long ingresosCents = jdbcTemplate.queryForObject(sqlIngresos, Long.class, from, to);
 
         // 2. COSTO (COGS)
-        // Sum of (unit_cost_cents_at_sale * quantity_sold) from sale_lines
+        // Sum of (unit_cost_cents * quantity) from sale_items
         String sqlCosto = """
-                SELECT COALESCE(SUM(sl.unit_cost_cents_at_sale * sl.quantity_sold), 0) 
-                FROM sale_lines sl
+                SELECT COALESCE(SUM(sl.unit_cost_cents * sl.quantity), 0)::bigint 
+                FROM sale_items sl
                 JOIN sales s ON sl.sale_id = s.id
                 WHERE s.sale_date >= ? AND s.sale_date <= ?
                 """;
@@ -39,7 +39,7 @@ public class AnalyticsQueryService {
 
         // 3. GASTO (Purchases)
         // Sum of purchases (inventory bought)
-        String sqlGasto = "SELECT COALESCE(SUM(total_price_cents), 0) FROM purchases WHERE purchase_date >= ? AND purchase_date <= ?";
+        String sqlGasto = "SELECT COALESCE(SUM(total_price_cents), 0)::bigint FROM purchases WHERE purchase_date >= ? AND purchase_date <= ?";
         Long gastoCents = jdbcTemplate.queryForObject(sqlGasto, Long.class, from, to);
 
         // 4. RENTABILIDAD
@@ -70,21 +70,21 @@ public class AnalyticsQueryService {
         String sql = """
             WITH sales_bucket AS (
                 SELECT 
-                    DATE_TRUNC(?, s.sale_date) as bucket_date,
-                    COALESCE(SUM(s.total_amount_cents), 0) as ingresos,
-                    COALESCE(SUM(sl.unit_cost_cents_at_sale * sl.quantity_sold), 0) as costo
+                    DATE_TRUNC('%s', s.sale_date) as bucket_date,
+                    COALESCE(SUM(s.total_amount_cents), 0)::bigint as ingresos,
+                    COALESCE(SUM(sl.unit_cost_cents * sl.quantity), 0)::bigint as costo
                 FROM sales s
-                LEFT JOIN sale_lines sl ON s.id = sl.sale_id
+                LEFT JOIN sale_items sl ON s.id = sl.sale_id
                 WHERE s.sale_date >= ? AND s.sale_date <= ?
-                GROUP BY DATE_TRUNC(?, s.sale_date)
+                GROUP BY DATE_TRUNC('%s', s.sale_date)
             ),
             purchases_bucket AS (
                 SELECT 
-                    DATE_TRUNC(?, purchase_date) as bucket_date,
-                    COALESCE(SUM(total_price_cents), 0) as gasto
+                    DATE_TRUNC('%s', purchase_date) as bucket_date,
+                    COALESCE(SUM(total_price_cents), 0)::bigint as gasto
                 FROM purchases
                 WHERE purchase_date >= ? AND purchase_date <= ?
-                GROUP BY DATE_TRUNC(?, purchase_date)
+                GROUP BY DATE_TRUNC('%s', purchase_date)
             )
             SELECT 
                 COALESCE(s.bucket_date, p.bucket_date) as time_bucket,
@@ -94,7 +94,7 @@ public class AnalyticsQueryService {
             FROM sales_bucket s
             FULL OUTER JOIN purchases_bucket p ON s.bucket_date = p.bucket_date
             ORDER BY time_bucket ASC
-        """;
+        """.formatted(dateTruncFormat, dateTruncFormat, dateTruncFormat, dateTruncFormat);
 
         return jdbcTemplate.query(sql, (rs, rowNum) -> Map.of(
                 "date", rs.getTimestamp("time_bucket").toLocalDateTime().toString(),
@@ -102,7 +102,7 @@ public class AnalyticsQueryService {
                 "costo", rs.getLong("costo") / 100.0,
                 "gasto", rs.getLong("gasto") / 100.0,
                 "rentabilidad", (rs.getLong("ingresos") - rs.getLong("costo")) / 100.0
-        ), dateTruncFormat, from, to, dateTruncFormat, dateTruncFormat, from, to, dateTruncFormat);
+        ), from, to, from, to);
     }
 
     /**
@@ -185,12 +185,11 @@ public class AnalyticsQueryService {
     public List<Map<String, Object>> getPriceTrends(String primaryProductId) {
         String sql = """
             SELECT 
-                p.purchase_date as date,
-                pl.unit_price_cents as unit_price_cents
-            FROM purchase_lines pl
-            JOIN purchases p ON pl.purchase_id = p.id
-            WHERE pl.primary_product_id = ?::uuid
-            ORDER BY p.purchase_date ASC
+                purchase_date as date,
+                (total_price_cents / quantity)::bigint as unit_price_cents
+            FROM purchases
+            WHERE primary_product_id = ?::uuid
+            ORDER BY purchase_date ASC
         """;
 
         return jdbcTemplate.query(sql, (rs, rowNum) -> Map.of(

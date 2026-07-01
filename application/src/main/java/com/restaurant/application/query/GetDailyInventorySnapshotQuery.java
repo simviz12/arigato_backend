@@ -26,6 +26,7 @@ public class GetDailyInventorySnapshotQuery {
         private String productType;
         private BigDecimal startOfDayStock;
         private BigDecimal currentStock;
+        private BigDecimal minStock;
         private BigDecimal totalSoldToday;
         private BigDecimal totalSoldTodayRevenue;
     }
@@ -46,11 +47,11 @@ public class GetDailyInventorySnapshotQuery {
                 GROUP BY si.final_product_id
             ),
             primary_stock AS (
-                SELECT id as product_id, name as product_name, 'PRIMARY' as product_type, current_stock_grams as current_stock
-                FROM primary_products WHERE active = true
+                SELECT id as product_id, name as product_name, 'PRIMARY' as product_type, current_stock_grams as current_stock, minimum_stock_alert as min_stock
+                FROM primary_products
             ),
             subproduct_stock AS (
-                SELECT id as product_id, name as product_name, 'SUBPRODUCT' as product_type, current_batch_stock_grams as current_stock
+                SELECT id as product_id, name as product_name, 'SUBPRODUCT' as product_type, current_batch_stock_grams as current_stock, 0.0 as min_stock
                 FROM subproducts WHERE active = true
             )
             SELECT 
@@ -58,15 +59,16 @@ public class GetDailyInventorySnapshotQuery {
                 fp.name as product_name,
                 'FINAL' as product_type,
                 0.0 as current_stock,
+                0.0 as min_stock,
                 COALESCE(st.total_sold, 0) as total_sold_today,
                 COALESCE(st.total_revenue, 0) / 100 as total_sold_today_revenue
             FROM final_products fp
             LEFT JOIN sales_today st ON fp.id = st.final_product_id
             WHERE fp.active = true
             UNION ALL
-            SELECT product_id, product_name, product_type, current_stock, 0.0, 0.0 FROM primary_stock
+            SELECT product_id, product_name, product_type, current_stock, min_stock, 0.0, 0.0 FROM primary_stock
             UNION ALL
-            SELECT product_id, product_name, product_type, current_stock, 0.0, 0.0 FROM subproduct_stock
+            SELECT product_id, product_name, product_type, current_stock, min_stock, 0.0, 0.0 FROM subproduct_stock
         """;
 
         return jdbcTemplate.query(sql, (rs, rowNum) -> SnapshotDto.builder()
@@ -75,6 +77,7 @@ public class GetDailyInventorySnapshotQuery {
                 .productType(rs.getString("product_type"))
                 .startOfDayStock(BigDecimal.ZERO) // Calculated dynamically in reality
                 .currentStock(rs.getBigDecimal("current_stock"))
+                .minStock(rs.getBigDecimal("min_stock"))
                 .totalSoldToday(rs.getBigDecimal("total_sold_today"))
                 .totalSoldTodayRevenue(rs.getBigDecimal("total_sold_today_revenue"))
                 .build());

@@ -69,6 +69,11 @@ public class AnalyticsController {
         return ResponseEntity.ok(distributorRankingService.getRankedDistributorsForProduct(productId));
     }
 
+    @GetMapping("/best-distributors/all")
+    public ResponseEntity<?> getAllRankings() {
+        return ResponseEntity.ok(distributorRankingService.getAllRankings());
+    }
+
     @GetMapping("/best-distributors/export-pdf")
     public ResponseEntity<byte[]> exportBestDistributorsPdf(@RequestParam(defaultValue = "false") boolean lowStock) {
         List<Map<String, Object>> rankingData = distributorRankingService.getBestDistributorPerProduct(lowStock, null);

@@ -23,7 +23,7 @@ public class DummyAdapters {
         public List<Subproduct> findAll() { return List.of(); }
     }
     
-    @Component
+    // @Component
     public static class DummyDistributorOfferRepository implements DistributorOfferRepository {
         public DistributorOffer save(DistributorOffer offer) { return offer; }
         public List<DistributorOffer> findByPrimaryProductId(UUID productId) { return List.of(); }
