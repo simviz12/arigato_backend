@@ -50,7 +50,7 @@ public class AuthController {
         
         Cookie refreshTokenCookie = new Cookie("refreshToken", pair.getRefreshToken());
         refreshTokenCookie.setHttpOnly(true);
-        refreshTokenCookie.setSecure(true); // Should be true in prod, fine for dev if localhost
+        refreshTokenCookie.setSecure(false); // false for local HTTP dev; set true in production HTTPS // Should be true in prod, fine for dev if localhost
         refreshTokenCookie.setPath("/api/auth");
         refreshTokenCookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
         response.addCookie(refreshTokenCookie);
@@ -67,7 +67,7 @@ public class AuthController {
         
         Cookie refreshTokenCookie = new Cookie("refreshToken", pair.getRefreshToken());
         refreshTokenCookie.setHttpOnly(true);
-        refreshTokenCookie.setSecure(true);
+        refreshTokenCookie.setSecure(false); // false for local HTTP dev; set true in production HTTPS
         refreshTokenCookie.setPath("/api/auth");
         refreshTokenCookie.setMaxAge(7 * 24 * 60 * 60);
         response.addCookie(refreshTokenCookie);
@@ -83,7 +83,7 @@ public class AuthController {
         
         Cookie clearCookie = new Cookie("refreshToken", null);
         clearCookie.setHttpOnly(true);
-        clearCookie.setSecure(true);
+        clearCookie.setSecure(false); // false for local HTTP dev
         clearCookie.setPath("/api/auth");
         clearCookie.setMaxAge(0);
         response.addCookie(clearCookie);
